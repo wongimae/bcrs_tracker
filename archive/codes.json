@@ -1,0 +1,12 @@
+{
+ "R": "RUNNING",
+ "F": "FULL",
+ "E": "ERROR",
+ "O": "OFFLINE",
+ "M": "MAINTENANCE",
+ "C": "CLEANING",
+ "S": "SUSPENDED",
+ "U": "UNKNOWN",
+ "_": null,
+ "a": "offline"
+}

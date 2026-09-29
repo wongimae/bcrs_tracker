@@ -1,38 +1,57 @@
-name: Build dashboard
+name: Update archive and dashboard
 
 on:
   schedule:
-    # Upstream snapshots land between 00:15 and ~02:30 SGT; build after that.
+    # Upstream snapshots land between 00:15 and ~02:30 SGT.
     - cron: "0 19 * * *"   # 03:00 SGT
-    - cron: "0 1 * * *"    # 09:00 SGT, catches late snapshots
+    - cron: "0 1 * * *"    # 09:00 SGT, retry
   push:
     branches: [main]
+    paths-ignore: ["archive/**"]   # the archive commit below shouldn't retrigger
   workflow_dispatch:
+    inputs:
+      source:
+        description: "Where to get new data"
+        type: choice
+        options: [auto, upstream, direct]
+        default: auto
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: archive
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Singapore
     steps:
-      - name: Check out this repo
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
 
-      - name: Clone the data repo with full history
-        run: git clone --quiet https://github.com/cheeaun/returnright-data.git upstream
+      - name: Add new days to the archive
+        run: python3 scripts/archive.py update --source "${{ inputs.source || 'auto' }}"
 
-      - name: Compile daily history
-        run: python3 scripts/compile_history.py upstream _site
+      - name: Commit the archive
+        run: |
+          git add archive
+          if git diff --cached --quiet; then
+            echo "Archive unchanged."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Archive $(tail -n1 archive/status.txt | cut -d' ' -f1)"
+            git pull --rebase --quiet && git push
+          fi
 
-      - name: Add the page
-        run: cp site/index.html _site/index.html
+      - name: Build the site
+        run: |
+          python3 scripts/compile_history.py _site
+          cp site/index.html _site/index.html
 
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5

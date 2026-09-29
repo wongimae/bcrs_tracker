@@ -1,69 +1,51 @@
 #!/usr/bin/env python3
 """
-Rebuild the daily history of Return Right machines from the git history of
-data/latest.json in a clone of cheeaun/returnright-data.
+Build the dashboard's data from the local archive (see archive.py).
 
-Usage: python3 compile_history.py <path-to-clone> <output-dir>
-Writes <output-dir>/history.json (for the dashboard) and daily_summary.csv.
+Usage: python3 compile_history.py <output-dir>
+Writes <output-dir>/history.json and <output-dir>/daily_summary.csv.
 """
-import csv, json, subprocess, sys
+import csv, json, sys
 from collections import Counter
 from pathlib import Path
+from archive import Archive
 
-REPO, OUT = Path(sys.argv[1]), Path(sys.argv[2])
-FILE = "data/latest.json"
-CODE = {"RUNNING": "R", "FULL": "F", "ERROR": "E", "OFFLINE": "O",
+OUT = Path(sys.argv[1])
+# Dashboard status letters; anything unrecognised shows as offline/unknown.
+DASH = {"RUNNING": "R", "FULL": "F", "ERROR": "E", "OFFLINE": "O",
         "MAINTENANCE": "M", "CLEANING": "C", "SUSPENDED": "S", "UNKNOWN": "U"}
 
-def git(*args):
-    return subprocess.run(["git", "-C", str(REPO), *args],
-                          capture_output=True, text=True, check=True).stdout
+a = Archive()
+to_dash = {code: DASH.get((raw or "UNKNOWN").upper(), "U") for code, raw in a.status_of.items()}
+to_dash["."] = "."
 
-def clean(v):
-    return (v or "").strip()
-
-# Every commit that touched the file, oldest first. %cs is the commit date in the
-# committer's own timezone (+08:00 for this repo), so days are Singapore days.
-by_day = {}
-for line in filter(None, git("log", "--reverse", "--format=%H %cs", "--", FILE).split("\n")):
-    sha, day = line.split()
-    by_day[day] = sha  # last commit of the day wins
-
-days, snapshots = [], []
-for day, sha in sorted(by_day.items()):
+machines = []
+for i, mid in enumerate(a.ids):
+    f = a.meta[mid][-1][1]  # latest known details
     try:
-        snapshots.append(json.loads(git("show", f"{sha}:{FILE}"))["data"])
-        days.append(day)
-    except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError):
-        print(f"skipping {day} ({sha[:7]}): unreadable", file=sys.stderr)
-
-N = len(days)
-machines, summary, statuses = {}, [], set()
-for i, records in enumerate(snapshots):
-    raw = Counter()
-    for r in records:
-        status = clean(r.get("status")).upper() or "UNKNOWN"
-        raw[status] += 1
-        m = machines.setdefault(r["id"], {"s": ["."] * N})
-        m["s"][i] = CODE.get(status, "U")
-        try:
-            m["la"], m["lo"] = round(float(r["latitude"]), 5), round(float(r["longitude"]), 5)
-        except (TypeError, ValueError, KeyError):
-            m.setdefault("la", None); m.setdefault("lo", None)
-        m["n"] = clean(r.get("locationName"))
-        m["a"] = clean(r.get("address"))
-        m["h"] = clean(r.get("rvmOpeningHours"))
-    statuses.update(raw)
-    summary.append({"date": days[i], "total": len(records), **raw})
+        la, lo = round(float(f.get("latitude")), 5), round(float(f.get("longitude")), 5)
+    except (TypeError, ValueError):
+        la = lo = None
+    machines.append({
+        "id": mid,
+        "s": "".join(to_dash[chars[i]] if i < len(chars) else "." for _, _, chars in a.days),
+        "n": (f.get("locationName") or "").strip(), "a": (f.get("address") or "").strip(),
+        "la": la, "lo": lo, "h": (f.get("rvmOpeningHours") or "").strip(),
+    })
 
 OUT.mkdir(parents=True, exist_ok=True)
-history = {"days": days,
-           "m": [{"id": k, **{f: ("".join(v) if f == "s" else v) for f, v in m.items()}}
-                 for k, m in sorted(machines.items())]}
-(OUT / "history.json").write_text(json.dumps(history, separators=(",", ":"), ensure_ascii=False))
+(OUT / "history.json").write_text(json.dumps(
+    {"days": [d for d, _, _ in a.days], "m": sorted(machines, key=lambda m: m["id"])},
+    separators=(",", ":"), ensure_ascii=False))
 
-with open(OUT / "daily_summary.csv", "w", newline="") as f:
-    w = csv.DictWriter(f, fieldnames=["date", "total", *sorted(statuses)], restval=0)
-    w.writeheader(); w.writerows(summary)
+statuses, rows = set(), []
+for d, src, chars in a.days:
+    c = Counter(a.status_of[ch] or "UNKNOWN" for ch in chars if ch != ".")
+    statuses.update(c)
+    rows.append({"date": d, "source": "upstream" if src == "u" else "returnright.sg",
+                 "total": sum(c.values()), **c})
+with open(OUT / "daily_summary.csv", "w", newline="") as fh:
+    w = csv.DictWriter(fh, fieldnames=["date", "source", "total", *sorted(statuses)], restval=0)
+    w.writeheader(); w.writerows(rows)
 
-print(f"{N} days ({days[0]} to {days[-1]}), {len(machines)} machines")
+print(f"{len(a.days)} days ({a.days[0][0]} to {a.days[-1][0]}), {len(machines)} machines")
