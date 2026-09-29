@@ -11,6 +11,7 @@
 :root{
   --paper:#EAF0EC; --panel:#F6F9F7; --ink:#0F2B25; --muted:#566B64; --line:#C5D1CB; --faint:#DCE5E0;
   --run:#2F9E62; --full:#E0A21B; --err:#D0463A; --off:#8A9892; --svc:#6A5AD0; --gone:transparent;
+  --op-tomra:#2F6FB3; --op-sgr:#9B4F96; --op-rvms:#178A86;
   --focus:#1F6FD6;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
@@ -18,7 +19,7 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --paper:#0D1B18; --panel:#132522; --ink:#E4EEE9; --muted:#93A8A0; --line:#2A403A; --faint:#1C302B;
-    --run:#44B87A; --full:#F0B535; --err:#EE6558; --off:#6F807A; --svc:#8C7EF0; --focus:#6FA8FF;
+    --run:#44B87A; --full:#F0B535; --err:#EE6558; --off:#6F807A; --svc:#8C7EF0; --focus:#6FA8FF; --op-tomra:#6FA3E6; --op-sgr:#C987C4; --op-rvms:#4FC2BD; --op-tomra:#6FA3E6; --op-sgr:#C987C4; --op-rvms:#4FC2BD;
   }
 }
 :root[data-theme="dark"]{
@@ -106,6 +107,41 @@ canvas.strip{display:block;width:260px;height:16px;border-radius:3px}
 footer{margin-top:48px;font-size:.82rem;color:var(--muted);max-width:70ch}
 footer a{color:inherit}
 
+
+/* machine detail (dropdown) */
+tr.detail>td{padding:0;background:var(--paper);border-bottom:1px solid var(--line);cursor:default}
+tbody tr.detail:hover td{background:var(--paper)}
+.dwrap{position:sticky;left:0;box-sizing:border-box;display:grid;grid-template-columns:200px minmax(0,1fr) 180px;gap:24px;padding:20px 22px 22px;box-shadow:inset 3px 0 0 var(--ink)}
+.dwrap h4{margin:0 0 6px;font-size:.8rem;font-weight:600;color:var(--muted)}
+.life b{display:block;font-stretch:112%;font-weight:850;font-size:2.4rem;line-height:1.05}
+.life p{margin:6px 0 0;color:var(--muted);font-size:.82rem;line-height:1.4}
+.op{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-size:.85rem}
+.op i{width:10px;height:10px;border-radius:2px}
+.dbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:6px 12px;font-size:.85rem;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.datepick{display:inline-flex;align-items:center;gap:4px}
+.datepick button{border:1px solid var(--line);background:var(--panel);border-radius:6px;width:30px;height:30px;cursor:pointer}
+.datepick input{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 8px;font-size:.85rem;color-scheme:light dark}
+.dchart{position:relative}
+.dchart svg{display:block;width:100%;height:auto}
+.dchart svg text{fill:var(--muted);font-size:11px;font-family:inherit}
+.dnote{margin:6px 0 0;color:var(--muted);font-size:.8rem}
+.ring{display:flex;flex-direction:column;align-items:center;text-align:center}
+.ring svg{width:132px;height:132px}
+.ring .val{font-stretch:112%;font-weight:800;font-size:1.7rem;fill:var(--ink)}
+.ring ul{list-style:none;margin:8px 0 0;padding:0;font-size:.8rem;color:var(--muted);line-height:1.45}
+.dempty{color:var(--muted);font-size:.9rem;padding:4px 0}
+.chart.wide{grid-column:1/-1}
+[hidden]{display:none!important}
+.oplegend{display:flex;gap:14px;flex-wrap:wrap;font-size:.82rem;margin:0 0 6px}
+.oplegend span{display:inline-flex;align-items:center;gap:6px}
+.oplegend i{width:10px;height:10px;border-radius:2px}
+@media (max-width:860px){
+  .dwrap{grid-template-columns:1fr 1fr}
+  .dwrap .dc{grid-column:1/-1;order:3}
+}
 @media (max-width:860px){
   .hero{grid-template-columns:1fr}
   .mapbox{border-right:0;border-bottom:1px solid var(--line)}
@@ -138,7 +174,7 @@ footer a{color:inherit}
       <div><div class="day" id="day"></div><div class="dow" id="dow"></div></div>
       <div class="avail"><b id="availPct"></b><span id="availTxt"></span></div>
       <ul class="legend" id="legend"></ul>
-      <p class="hint">Tap a status to show only those machines. Hover a dot for details.</p>
+      <p class="hint">Tap a status to show only those machines. Select a dot for its details.</p>
     </div>
     <div class="scrub">
       <button class="play" id="play" aria-label="Play timeline"><svg viewBox="0 0 14 14" id="playIcon"><path d="M2 1l11 6-11 6z"/></svg></button>
@@ -155,6 +191,7 @@ footer a{color:inherit}
     <div class="charts">
       <div class="chart"><h3>Machines in the network</h3><p class="sub">Accepting containers, shaded; not accepting, the gap above</p><svg id="c1" viewBox="0 0 520 230"></svg><div class="tip" id="tip1"></div></div>
       <div class="chart"><h3>Machines not accepting containers</h3><p class="sub">By reason, per day</p><svg id="c2" viewBox="0 0 520 230"></svg><div class="tip" id="tip2"></div></div>
+      <div class="chart wide" id="opcard" hidden><h3>Containers returned per day, by operator</h3><p class="sub" id="opsub"></p><div class="oplegend" id="oplegend"></div><svg id="c3" viewBox="0 0 1060 230"></svg><div class="tip" id="tip3"></div></div>
     </div>
   </section>
 
@@ -184,7 +221,7 @@ footer a{color:inherit}
   </section>
 
   <footer>
-    Built from every daily snapshot of <code>data/latest.json</code> in the repo’s commit history, one snapshot per day (Singapore time). “Accepting” means the machine reported RUNNING. “Service” groups maintenance, cleaning and suspended; “Offline” includes the few unknown readings. Rebuilt automatically every morning; latest snapshot <span id="foot"></span>. <a href="history.json">history.json</a> · <a href="daily_summary.csv">daily_summary.csv</a>
+    Built from a daily archive of the Return Right machine list, taken from <a href="https://github.com/cheeaun/returnright-data">cheeaun/returnright-data</a> or, if that is unavailable, directly from returnright.sg. One snapshot per day, Singapore time. “Accepting” means the machine reported RUNNING. “Service” groups maintenance, cleaning and suspended; “Offline” includes the few unknown readings. Rebuilt automatically every morning; latest snapshot <span id="foot"></span>. <a href="history.json">history.json</a> · <a href="daily_summary.csv">daily_summary.csv</a>
   </footer>
 </div>
 
@@ -403,9 +440,11 @@ function paintTable(){
   tb.innerHTML=slice.map(m=>{
     const c=m.s[cur], g=c==='.'?null:G[c];
     const st=m._st?`<br><span style="color:var(--muted);font-size:.8rem">${m._st} day${m._st>1?'s':''} out</span>`:'';
-    return `<tr data-id="${m.id}" class="${m.id===selId?'sel':''}" tabindex="0"><td class="nm"><b>${esc(m.n)}</b><span>${esc(m.a)}${m.h?' · '+esc(m.h.replace(/\s+/g,' ')):''}</span></td><td><span class="pill"><i style="background:${g?COL[g]:'transparent'};${g?'':'border:1px solid var(--line)'}"></i>${statusName(c)}</span>${st}</td><td class="pct">${m.present?Math.round(m.pct*100)+'%':'–'}<br><span style="color:var(--muted);font-weight:400;font-size:.8rem">${m.run}/${m.present}</span></td><td><canvas class="strip" width="520" height="32"></canvas></td></tr>`;
+    return `<tr data-id="${m.id}" class="${m.id===selId?'sel':''}" tabindex="0" aria-expanded="false"><td class="nm"><b>${esc(m.n)}</b><span>${esc(m.a)}${m.h?' · '+esc(m.h.replace(/\s+/g,' ')):''}</span></td><td><span class="pill"><i style="background:${g?COL[g]:'transparent'};${g?'':'border:1px solid var(--line)'}"></i>${statusName(c)}</span>${st}</td><td class="pct">${m.present?Math.round(m.pct*100)+'%':'–'}<br><span style="color:var(--muted);font-weight:400;font-size:.8rem">${m.run}/${m.present}</span></td><td><canvas class="strip" width="520" height="32"></canvas></td></tr>`;
   }).join('');
-  tb.querySelectorAll('tr').forEach((tr,j)=>drawStrip(tr.querySelector('canvas'),slice[j]));
+  tb.querySelectorAll('tr[data-id]').forEach((tr,j)=>drawStrip(tr.querySelector('canvas'),slice[j]));
+  const selTr=selId!=null && tb.querySelector(`tr[data-id="${selId}"]`);
+  if(selTr){ selTr.setAttribute('aria-expanded','true'); selTr.insertAdjacentHTML('afterend','<tr class="detail"><td colspan="4"><div class="dwrap" id="dwrap"></div></td></tr>'); renderDetail(); }
   more.hidden=rows.length<=shown;
   more.textContent=`Show more (${(rows.length-shown).toLocaleString()} left)`;
 }
@@ -421,14 +460,124 @@ q.addEventListener('input',()=>{ shown=40; refreshTable(); });
 fStatus.addEventListener('change',()=>{ shown=40; refreshTable(); });
 sortSel.addEventListener('change',()=>{ shown=40; refreshTable(); });
 more.addEventListener('click',()=>{ shown+=80; paintTable(); });
-tb.addEventListener('click',e=>{ const tr=e.target.closest('tr'); if(tr) select(+tr.dataset.id,false); });
-tb.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const tr=e.target.closest('tr'); if(tr) select(+tr.dataset.id,false); } });
+tb.addEventListener('click',e=>{ if(e.target.closest('tr.detail')) return; const tr=e.target.closest('tr[data-id]'); if(tr) select(+tr.dataset.id,false); });
+tb.addEventListener('keydown',e=>{ if(e.key==='Enter' && e.target.matches('tr[data-id]')) select(+e.target.dataset.id,false); });
 
 function select(id,fromMap){
   selId = selId===id?null:id;
   paintMap();
-  if(fromMap){ q.value=''; fStatus.value=''; shown=40; refreshTable(); document.querySelector('.tablewrap').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}); }
-  else { tb.querySelectorAll('tr').forEach(tr=>tr.classList.toggle('sel',+tr.dataset.id===selId)); if(selId!=null) mapbox.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'}); }
+  if(fromMap){ q.value=''; fStatus.value=''; shown=40; refreshTable(); const tr=tb.querySelector(`tr[data-id="${selId}"]`); (tr||document.querySelector('.tablewrap')).scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}); }
+  else paintTable();
+}
+
+// ---------- bin readings: machine detail + operator chart ----------
+const BIN = D.bins || null;
+const OPS = {TOMRA001:{n:'TOMRA',v:'--op-tomra'}, SGRECYCLE001:{n:'SG Recycle',v:'--op-sgr'}, RVMS001:{n:'RVM Systems',v:'--op-rvms'}};
+const opName = s => (OPS[s]||{n:'Other'}).n, opVar = s => (OPS[s]||{v:'--off'}).v;
+const mcache = {};
+let dMode='daily', dDay=null;
+const fmtK = v => v>=10000? new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}).format(v) : v.toLocaleString();
+const fmtD = s => new Date(s+'T00:00:00').toLocaleDateString('en-SG',{day:'numeric',month:'short'});
+const addDays = (s,n) => { const d=new Date(s+'T00:00:00'); d.setDate(d.getDate()+n); return d.toLocaleDateString('en-CA'); };
+function dayRange(a,b){ const out=[]; for(let d=a; d<=b; d=addDays(d,1)) out.push(d); return out; }
+
+async function loadMachine(id){
+  if(id in mcache) return mcache[id];
+  try{ const r=await fetch(`m/${id}.json`,{cache:'no-cache'}); mcache[id]= r.ok? await r.json() : null; }
+  catch(e){ mcache[id]=null; }
+  return mcache[id];
+}
+
+async function renderDetail(){
+  const box=document.getElementById('dwrap'); if(!box) return;
+  box.style.width=document.querySelector('.tablewrap').clientWidth+'px';
+  const id=selId, m=M.find(x=>x.id===id);
+  if(!BIN){ box.innerHTML=`<div class="dempty" style="grid-column:1/-1">Bin readings haven’t started yet. Containers returned and bin fullness appear here after the first hourly reading.</div>`; return; }
+  box.innerHTML=`<div class="dempty" style="grid-column:1/-1">Loading ${esc(m?m.n:'machine')}…</div>`;
+  const d=await loadMachine(id);
+  if(selId!==id || !document.getElementById('dwrap')) return;   // selection changed meanwhile
+  if(!d){ box.innerHTML=`<div class="dempty" style="grid-column:1/-1">No bin readings for this machine. It may be newly added, or no longer listed by BCRS.</div>`; return; }
+  const since=fmtD(BIN.first.slice(0,10));
+  box.innerHTML=`
+    <div class="life"><h4>Containers returned</h4><b>${d.life.toLocaleString()}</b>
+      <p>${d.counter? 'Lifetime total from the machine’s own counter.' : `Since tracking began on ${since}. Estimated from hourly bin readings.`}</p>
+      <span class="op"><i style="background:var(${opVar(d.s)})"></i>${opName(d.s)}</span></div>
+    <div class="dc"><div class="dbar">
+        <div class="seg" role="group" aria-label="Chart period"><button data-mode="daily" aria-pressed="${dMode==='daily'}">Daily</button><button data-mode="hourly" aria-pressed="${dMode==='hourly'}">Hourly</button></div>
+        <span class="datepick" ${dMode==='hourly'?'':'hidden'}><button data-step="-1" aria-label="Previous day">‹</button><input type="date" aria-label="Day to show"><button data-step="1" aria-label="Next day">›</button></span>
+      </div><div class="dchart"><svg viewBox="0 0 560 200"></svg><div class="tip"></div></div><p class="dnote"></p></div>
+    <div class="ring"><h4>Bin fullness now</h4>${ringSvg(d.fill)}<ul>${d.comps.map(c=> c.cap? `<li>${esc(c.type)}: ${c.n.toLocaleString()} of ${c.cap.toLocaleString()}</li>` : `<li>${esc(c.type)}: ${c.fill}% (reported by machine)</li>`).join('')}</ul>
+      <p class="dnote">Reading at ${new Date(BIN.read).toLocaleTimeString('en-SG',{hour:'numeric',minute:'2-digit',timeZone:'Asia/Singapore'})}, ${fmtD(BIN.read.slice(0,10))}</p></div>`;
+  const days=Object.keys(d.h).sort();
+  const first=BIN.first.slice(0,10), last=BIN.read.slice(0,10);
+  if(!dDay || dDay<first || dDay>last) dDay=last;
+  const inp=box.querySelector('input[type=date]'); inp.min=first; inp.max=last; inp.value=dDay;
+  box.querySelector('.seg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; dMode=b.dataset.mode; renderDetail(); });
+  box.querySelector('.datepick').addEventListener('click',e=>{ const b=e.target.closest('button[data-step]'); if(!b) return; const n=addDays(dDay,+b.dataset.step); if(n<first||n>last) return; dDay=n; drawDetailChart(d); inp.value=dDay; });
+  inp.addEventListener('change',()=>{ if(inp.value>=first && inp.value<=last){ dDay=inp.value; drawDetailChart(d); } });
+  drawDetailChart(d);
+}
+
+function ringSvg(p){
+  if(p==null) return '<svg viewBox="0 0 132 132"></svg>';
+  const r=54, C=2*Math.PI*r, v=Math.max(0,Math.min(100,p));
+  const col = v>=90?'var(--err)': v>=70?'var(--full)':'var(--run)';
+  return `<svg viewBox="0 0 132 132" role="img" aria-label="Bin ${v}% full"><circle cx="66" cy="66" r="${r}" fill="none" stroke="var(--faint)" stroke-width="12"/>
+    <circle cx="66" cy="66" r="${r}" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(C*v/100).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 66 66)"/>
+    <text class="val" x="66" y="74" text-anchor="middle">${v}%</text></svg>`;
+}
+
+function drawDetailChart(d){
+  const box=document.getElementById('dwrap'); if(!box) return;
+  const svg=box.querySelector('.dchart svg'), tip=box.querySelector('.dchart .tip'), note=box.querySelector('.dc .dnote');
+  const W=560,H=200,L=40,R=6,T=10,Bm=24, col=`var(${opVar(d.s)})`;
+  let labels, vals, lab;
+  if(dMode==='daily'){
+    labels=dayRange(BIN.first.slice(0,10), BIN.read.slice(0,10));
+    vals=labels.map(x=>(d.h[x]||[]).reduce((a,b)=>a+b,0));
+    lab=i=>`<b>${fmtD(labels[i])}</b><br>${vals[i].toLocaleString()} containers`;
+    note.textContent=`${vals.reduce((a,b)=>a+b,0).toLocaleString()} containers over ${labels.length} day${labels.length>1?'s':''}`;
+  } else {
+    labels=[...Array(24).keys()];
+    vals=(d.h[dDay]||Array(24).fill(0));
+    const hh=h=>`${(h%12)||12}${h<12?'am':'pm'}`;
+    lab=i=>`<b>${hh(i)}–${hh((i+1)%24)}</b><br>${vals[i].toLocaleString()} containers`;
+    const tot=vals.reduce((a,b)=>a+b,0);
+    note.textContent= tot? `${tot.toLocaleString()} containers on ${new Date(dDay+'T00:00:00').toLocaleDateString('en-SG',{weekday:'long',day:'numeric',month:'long'})}` : `No returns recorded on ${fmtD(dDay)}`;
+  }
+  const n=vals.length, max=Math.max(4,...vals);
+  const step=Math.pow(10,Math.floor(Math.log10(max/2))); const tickStep=[1,2,5,10].map(k=>k*step).find(s=>max/s<=4);
+  const top=Math.ceil(max/tickStep)*tickStep;
+  const y=v=>T+(H-T-Bm)*(1-v/top), bw=(W-L-R)/n, x=i=>L+i*bw;
+  let s='';
+  for(let v=0; v<=top; v+=tickStep) s+=`<line class="axis" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke-dasharray="${v?'2 3':''}"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${fmtK(v)}</text>`;
+  vals.forEach((v,i)=>{ if(v) s+=`<rect x="${(x(i)+bw*0.12).toFixed(1)}" width="${Math.max(1,bw*0.76).toFixed(1)}" y="${y(v).toFixed(1)}" height="${(y(0)-y(v)).toFixed(1)}" rx="1.5" fill="${col}"/>`; });
+  if(dMode==='hourly') [0,6,12,18].forEach(h=>s+=`<text x="${x(h)+bw/2}" y="${H-6}" text-anchor="middle">${h===0?'12am':h===12?'12pm':h<12?h+'am':(h-12)+'pm'}</text>`);
+  else { const every=Math.max(1,Math.ceil(n/7)); labels.forEach((l,i)=>{ if(i%every===0) s+=`<text x="${x(i)+bw/2}" y="${H-6}" text-anchor="middle">${fmtD(l)}</text>`; }); }
+  svg.innerHTML=s;
+  svg.onpointermove=e=>{ const r=svg.getBoundingClientRect(), i=Math.floor(((e.clientX-r.left)/r.width*W-L)/bw); if(i<0||i>=n){ tip.classList.remove('on'); return; }
+    const br=svg.parentElement.getBoundingClientRect(); tip.innerHTML=lab(i); tip.style.left=(e.clientX-br.left)+'px'; tip.style.top=(e.clientY-br.top)+'px'; tip.classList.add('on'); };
+  svg.onpointerleave=()=>tip.classList.remove('on');
+}
+
+function drawC3(){
+  if(!BIN || !BIN.days.length) return;
+  document.getElementById('opcard').hidden=false;
+  const svg=document.getElementById('c3'), tip=document.getElementById('tip3'), W=1060,H=230,L=48,R=8,T=10,Bm=26;
+  const ops=Object.keys(BIN.sup).sort((a,b)=>opName(a).localeCompare(opName(b)));
+  const days=BIN.days, n=days.length, tot=days.map((_,i)=>ops.reduce((a,s)=>a+BIN.sup[s][i],0));
+  document.getElementById('oplegend').innerHTML=ops.map(s=>`<span><i style="background:var(${opVar(s)})"></i>${opName(s)}: ${BIN.sup[s].reduce((a,b)=>a+b,0).toLocaleString()}</span>`).join('');
+  document.getElementById('opsub').textContent=`Estimated from hourly bin readings since ${fmtD(BIN.first.slice(0,10))}. The latest day is still in progress.`;
+  const max=Math.max(10,...tot); const step=Math.pow(10,Math.floor(Math.log10(max/2))); const ts=[1,2,5,10].map(k=>k*step).find(s=>max/s<=4); const top=Math.ceil(max/ts)*ts;
+  const y=v=>T+(H-T-Bm)*(1-v/top), bw=(W-L-R)/n, x=i=>L+i*bw;
+  let s=''; for(let v=0;v<=top;v+=ts) s+=`<line class="axis" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke-dasharray="${v?'2 3':''}"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${fmtK(v)}</text>`;
+  days.forEach((dd,i)=>{ let acc=0; ops.forEach(o=>{ const v=BIN.sup[o][i]; if(!v) return; s+=`<rect x="${(x(i)+bw*0.1).toFixed(1)}" width="${Math.max(1,bw*0.8).toFixed(1)}" y="${y(acc+v).toFixed(1)}" height="${(y(acc)-y(acc+v)).toFixed(1)}" fill="var(${opVar(o)})"/>`; acc+=v; }); });
+  const every=Math.max(1,Math.ceil(n/10)); days.forEach((dd,i)=>{ if(i%every===0) s+=`<text x="${x(i)+bw/2}" y="${H-8}" text-anchor="middle">${fmtD(dd)}</text>`; });
+  svg.innerHTML=s;
+  const box=svg.parentElement;
+  svg.onpointermove=e=>{ const r=svg.getBoundingClientRect(), i=Math.floor(((e.clientX-r.left)/r.width*W-L)/bw); if(i<0||i>=n){ tip.classList.remove('on'); return; }
+    const br=box.getBoundingClientRect(); tip.innerHTML=`<b>${fmtD(days[i])}</b><br>`+ops.map(o=>`${opName(o)} ${BIN.sup[o][i].toLocaleString()}`).join('<br>')+`<br>Total ${tot[i].toLocaleString()}`; tip.style.left=(e.clientX-br.left)+'px'; tip.style.top=(e.clientY-br.top)+'px'; tip.classList.add('on'); };
+  svg.onpointerleave=()=>tip.classList.remove('on');
 }
 
 // ---------- day change ----------
@@ -439,11 +588,12 @@ function setDay(i){
   clearTimeout(tblPending); tblPending=setTimeout(refreshTable, timer?250:40);
 }
 
-function drawAll(){ readColors(); drawC1(); drawC2(); moveCursors(); paintMap(); paintTable(); }
+window.addEventListener('resize',()=>{ const b=document.getElementById('dwrap'); if(b) b.style.width=document.querySelector('.tablewrap').clientWidth+'px'; });
+function drawAll(){ readColors(); drawC1(); drawC2(); drawC3(); moveCursors(); paintMap(); paintTable(); }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',drawAll);
 new MutationObserver(drawAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
-drawC1(); drawC2(); paintSide(); paintMap(); moveCursors(); refreshTable();
+drawC1(); drawC2(); drawC3(); paintSide(); paintMap(); moveCursors(); refreshTable();
 })();
 </script>
 </body>

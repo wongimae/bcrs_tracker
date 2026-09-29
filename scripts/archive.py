@@ -201,7 +201,10 @@ def update(source="auto"):
                     problems.append(str(e))
         except RuntimeError as e:
             problems.append(str(e))
-    if source == "direct" or (source == "auto" and a.last_date != today):
+    # In auto mode, give upstream until 06:00 SGT to publish today's snapshot
+    # (it normally lands by 02:30) before fetching directly.
+    late = dt.datetime.now(SGT).hour >= 6
+    if source == "direct" or (source == "auto" and a.last_date != today and late):
         try:
             if a.add_day(today, from_returnright(), "d"): added.append(f"{today} (returnright.sg)")
         except (RuntimeError, ValueError) as e:

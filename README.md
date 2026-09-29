@@ -38,6 +38,23 @@ Three fields that changed on every snapshot and carried no lasting meaning
 (`rvm_last_conn`, `updatedAt`, `distance`) are not kept; upstream stopped publishing them
 on 2026-09-16.
 
+### Bin readings (`archive/bins/`)
+
+| File | What it holds |
+|---|---|
+| `returns-YYYY-MM.txt` | One line per hour: `2026-09-30T14 2bs:c 2bt:1f ...` = machine id and containers taken that hour, both base 36. Machines with no returns are left out. |
+| `state.json` | The latest raw reading per machine (capacity, count, fill level). Overwritten each hour. |
+
+How returns are counted: TOMRA machines report a lifetime counter that only goes up, so
+returns are its increase, and the machine's lifetime total is exact. RVM Systems and
+SG Recycle machines report what's in the bin, so returns are estimated from increases, and
+a large drop is treated as the bin being emptied. A bin that's filled and emptied within
+the same hour is undercounted.
+
+Three fields that changed on every snapshot and carried no lasting meaning
+(`rvm_last_conn`, `updatedAt`, `distance`) are not kept; upstream stopped publishing them
+on 2026-09-16.
+
 ## Setup
 
 1. Push these files to the `main` branch of a public repo.

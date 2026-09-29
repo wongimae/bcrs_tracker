@@ -2,9 +2,9 @@ name: Update archive and dashboard
 
 on:
   schedule:
-    # Upstream snapshots land between 00:15 and ~02:30 SGT.
-    - cron: "0 19 * * *"   # 03:00 SGT
-    - cron: "0 1 * * *"    # 09:00 SGT, retry
+    # Every hour at :07. Each run reads every machine's bins (about 6 minutes),
+    # picks up the daily machine list once it's published, and redeploys.
+    - cron: "7 * * * *"
   push:
     branches: [main]
     paths-ignore: ["archive/**"]   # the archive commit below shouldn't retrigger
@@ -36,6 +36,11 @@ jobs:
       - name: Add new days to the archive
         run: python3 scripts/archive.py update --source "${{ inputs.source || 'auto' }}"
 
+      - name: Read every machine's bins
+        continue-on-error: true      # a bad hour shouldn't stop the dashboard updating
+        timeout-minutes: 25
+        run: python3 scripts/bins.py
+
       - name: Commit the archive
         run: |
           git add archive
@@ -44,7 +49,7 @@ jobs:
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
-            git commit -m "Archive $(tail -n1 archive/status.txt | cut -d' ' -f1)"
+            git commit -m "Archive $(date +%Y-%m-%dT%H:%M)"
             git pull --rebase --quiet && git push
           fi
 

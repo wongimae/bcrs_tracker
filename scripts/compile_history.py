@@ -49,3 +49,45 @@ with open(OUT / "daily_summary.csv", "w", newline="") as fh:
     w.writeheader(); w.writerows(rows)
 
 print(f"{len(a.days)} days ({a.days[0][0]} to {a.days[-1][0]}), {len(machines)} machines")
+
+
+# ---------- bin readings (scripts/bins.py) ----------
+BINS = Path(__file__).resolve().parent.parent / "archive" / "bins"
+state_file = BINS / "state.json"
+if state_file.exists():
+    state = json.loads(state_file.read_text())
+    hourly = {}                      # id -> day -> [24]
+    net = {}                         # day -> supplier -> n
+    for f in sorted(BINS.glob("returns-*.txt")):
+        for line in f.read_text().splitlines():
+            parts = line.split()
+            if not parts:
+                continue
+            day, hr = parts[0][:10], int(parts[0][11:13])
+            for tok in parts[1:]:
+                mid, n = (int(x, 36) for x in tok.split(":"))
+                hourly.setdefault(mid, {}).setdefault(day, [0] * 24)[hr] += n
+                sup = state["m"].get(str(mid), {}).get("s", "UNKNOWN")
+                net.setdefault(day, {}).setdefault(sup, 0)
+                net[day][sup] += n
+    (OUT / "m").mkdir(exist_ok=True)
+    for sid, rec in state["m"].items():
+        mid, comps = int(sid), rec["c"]
+        h = hourly.get(mid, {})
+        counters = [c for c in comps if c["cap"] == 0]
+        fills = [round(c["n"] / c["cap"] * 100) if c["cap"] else c["fill"] for c in comps]
+        (OUT / "m" / f"{mid}.json").write_text(json.dumps({
+            "s": rec["s"],
+            "life": sum(c["n"] for c in counters) if counters else sum(sum(v) for v in h.values()),
+            "counter": bool(counters),
+            "fill": max(fills) if fills else None,
+            "comps": comps,
+            "h": h,
+        }, separators=(",", ":")))
+    days = sorted(net)
+    sups = sorted({s for d in net.values() for s in d})
+    hist = json.loads((OUT / "history.json").read_text())
+    hist["bins"] = {"first": state.get("first"), "read": state.get("t"), "days": days,
+                    "sup": {s: [net[d].get(s, 0) for d in days] for s in sups}}
+    (OUT / "history.json").write_text(json.dumps(hist, separators=(",", ":"), ensure_ascii=False))
+    print(f"bin readings: {len(state['m'])} machines, {len(days)} days of returns")
