@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Return Right machines, day by day</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EAF0EC; --panel:#F6F9F7; --ink:#0F2B25; --muted:#566B64; --line:#C5D1CB; --faint:#DCE5E0;
+  --run:#2F9E62; --full:#E0A21B; --err:#D0463A; --off:#8A9892; --svc:#6A5AD0; --gone:transparent;
+  --focus:#1F6FD6;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0D1B18; --panel:#132522; --ink:#E4EEE9; --muted:#93A8A0; --line:#2A403A; --faint:#1C302B;
+    --run:#44B87A; --full:#F0B535; --err:#EE6558; --off:#6F807A; --svc:#8C7EF0; --focus:#6FA8FF;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0D1B18; --panel:#132522; --ink:#E4EEE9; --muted:#93A8A0; --line:#2A403A; --faint:#1C302B;
+  --run:#44B87A; --full:#F0B535; --err:#EE6558; --off:#6F807A; --svc:#8C7EF0; --focus:#6FA8FF;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.5;font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 56px}
+h1{font-stretch:125%;font-weight:850;font-size:clamp(2rem,5.2vw,3.6rem);line-height:.98;letter-spacing:-.02em;margin:0 0 14px;max-width:14ch}
+h2{font-stretch:112%;font-weight:750;font-size:1.35rem;line-height:1.2;margin:0 0 4px}
+.lede{color:var(--muted);max-width:62ch;margin:0}
+.lede strong{color:var(--ink);font-weight:600}
+header{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:end;margin-bottom:28px}
+.src{font-size:.85rem;color:var(--muted);text-align:right}
+.src a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.mapbox{position:relative;border-right:1px solid var(--line);min-width:0}
+#map{display:block;width:100%;height:auto}
+#map circle{stroke:var(--panel);stroke-width:.8}
+#map circle.sel{stroke:var(--ink);stroke-width:2.5}
+.side{padding:22px 22px 18px;display:flex;flex-direction:column;gap:16px}
+.day{font-stretch:125%;font-weight:800;font-size:2rem;line-height:1}
+.dow{color:var(--muted);font-size:.9rem;margin-top:4px}
+.avail{display:flex;align-items:baseline;gap:8px}
+.avail b{font-size:2.6rem;font-weight:850;font-stretch:112%;line-height:1;color:var(--run)}
+.avail span{color:var(--muted);font-size:.9rem;line-height:1.25}
+.legend{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.legend li{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;font-size:.92rem}
+.legend button{all:unset;display:contents;cursor:pointer}
+.legend li.dim{opacity:.35}
+.sw{width:12px;height:12px;border-radius:50%}
+.legend .n{font-weight:650}
+.legend .bar{grid-column:2/4;height:4px;background:var(--faint);border-radius:2px;overflow:hidden;margin-top:-4px}
+.legend .bar i{display:block;height:100%}
+.hint{font-size:.8rem;color:var(--muted);margin-top:auto}
+.scrub{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line);grid-column:1/-1}
+.play{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--paper);cursor:pointer;display:grid;place-items:center;flex:none}
+.play svg{width:14px;height:14px;fill:var(--ink)}
+input[type=range]{flex:1;accent-color:var(--ink);min-width:0}
+.scrub .ends{font-size:.8rem;color:var(--muted);white-space:nowrap}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--paper);padding:7px 10px;border-radius:8px;font-size:.82rem;line-height:1.35;max-width:240px;transform:translate(-50%,calc(-100% - 12px));opacity:0;transition:opacity .1s}
+.tip.on{opacity:1}
+.tip b{font-weight:650}
+
+/* charts */
+section{margin-top:44px}
+.sechead{display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.sechead p{margin:0;color:var(--muted);font-size:.92rem;max-width:60ch}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px 10px;position:relative;min-width:0}
+.chart h3{margin:0 0 2px;font-size:1rem;font-weight:650}
+.chart .sub{margin:0 0 8px;color:var(--muted);font-size:.85rem}
+.chart svg{display:block;width:100%;height:auto;cursor:crosshair}
+.chart svg text{fill:var(--muted);font-size:12px;font-family:inherit}
+.axis{stroke:var(--line)}
+.cursor{stroke:var(--ink);stroke-width:1.2}
+
+/* table */
+.tools{display:flex;gap:10px;flex-wrap:wrap}
+.tools input,.tools select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.92rem}
+.tools input{width:220px;max-width:100%}
+.tablewrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.9rem;min-width:760px}
+th{text-align:left;font-weight:600;color:var(--muted);font-size:.8rem;padding:10px 14px;border-bottom:1px solid var(--line)}
+td{padding:9px 14px;border-bottom:1px solid var(--faint);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--faint)}
+tbody tr.sel td{background:var(--faint);box-shadow:inset 3px 0 0 var(--ink)}
+td.nm b{display:block;font-weight:600}
+td.nm span{color:var(--muted);font-size:.82rem}
+.pill{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.pill i{width:9px;height:9px;border-radius:50%}
+td.pct{font-weight:650;text-align:right}
+canvas.strip{display:block;width:260px;height:16px;border-radius:3px}
+.more{display:block;margin:14px auto 0;padding:9px 18px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.loading{position:fixed;inset:auto 0 0 0;margin:0;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);font-size:.9rem;z-index:5}
+footer{margin-top:48px;font-size:.82rem;color:var(--muted);max-width:70ch}
+footer a{color:inherit}
+
+@media (max-width:860px){
+  .hero{grid-template-columns:1fr}
+  .mapbox{border-right:0;border-bottom:1px solid var(--line)}
+  .side{display:grid;grid-template-columns:1fr 1fr;align-items:start}
+  .legend{grid-column:1/-1}
+  .hint{display:none}
+  .charts{grid-template-columns:1fr}
+  header{grid-template-columns:1fr}
+  .src{text-align:left}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="loading" id="loadmsg" role="status">Loading daily history…</p>
+  <header>
+    <div>
+      <h1>Return Right machines, day by day</h1>
+      <p class="lede" id="lede"></p>
+    </div>
+    <div class="src">Data: <a href="https://github.com/cheeaun/returnright-data" target="_blank" rel="noopener">cheeaun/returnright-data</a><br><span id="snap"></span></div>
+  </header>
+
+  <div class="hero">
+    <div class="mapbox">
+      <svg id="map" viewBox="0 0 1000 600" role="img" aria-label="Map of reverse vending machines in Singapore, coloured by status"></svg>
+      <div class="tip" id="maptip"></div>
+    </div>
+    <div class="side">
+      <div><div class="day" id="day"></div><div class="dow" id="dow"></div></div>
+      <div class="avail"><b id="availPct"></b><span id="availTxt"></span></div>
+      <ul class="legend" id="legend"></ul>
+      <p class="hint">Tap a status to show only those machines. Hover a dot for details.</p>
+    </div>
+    <div class="scrub">
+      <button class="play" id="play" aria-label="Play timeline"><svg viewBox="0 0 14 14" id="playIcon"><path d="M2 1l11 6-11 6z"/></svg></button>
+      <span class="ends" id="startLbl"></span>
+      <input type="range" id="range" min="0" value="0" aria-label="Choose a day">
+      <span class="ends" id="endLbl"></span>
+    </div>
+  </div>
+
+  <section>
+    <div class="sechead">
+      <div><h2>Over time</h2><p>Click either chart to jump the map to that day.</p></div>
+    </div>
+    <div class="charts">
+      <div class="chart"><h3>Machines in the network</h3><p class="sub">Accepting containers, shaded; not accepting, the gap above</p><svg id="c1" viewBox="0 0 520 230"></svg><div class="tip" id="tip1"></div></div>
+      <div class="chart"><h3>Machines not accepting containers</h3><p class="sub">By reason, per day</p><svg id="c2" viewBox="0 0 520 230"></svg><div class="tip" id="tip2"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead">
+      <div><h2>Every machine</h2><p>Each strip is one machine's history, one sliver per day from left to right. Blank means it wasn't listed yet, or had been removed.</p></div>
+      <div class="tools">
+        <input type="search" id="q" placeholder="Search name, address or postcode" aria-label="Search machines">
+        <select id="fStatus" aria-label="Filter by status on selected day"></select>
+        <select id="sort" aria-label="Sort machines">
+          <option value="down">Longest out of action</option>
+          <option value="worst">Least reliable first</option>
+          <option value="best">Most reliable first</option>
+          <option value="name">Name A–Z</option>
+          <option value="new">Newest first</option>
+        </select>
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Machine</th><th>Status on <span id="thDay"></span></th><th style="text-align:right">Days accepting</th><th>History</th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden>No machines match. Clear the search or pick a different status.</div>
+    </div>
+    <button class="more" id="more" hidden></button>
+  </section>
+
+  <footer>
+    Built from every daily snapshot of <code>data/latest.json</code> in the repo’s commit history, one snapshot per day (Singapore time). “Accepting” means the machine reported RUNNING. “Service” groups maintenance, cleaning and suspended; “Offline” includes the few unknown readings. Rebuilt automatically every morning; latest snapshot <span id="foot"></span>. <a href="history.json">history.json</a> · <a href="daily_summary.csv">daily_summary.csv</a>
+  </footer>
+</div>
+
+<script>
+(async function(){
+const status=document.getElementById('loadmsg');
+let D;
+try{
+  const res=await fetch('history.json',{cache:'no-cache'});
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  D=await res.json();
+}catch(err){
+  status.textContent='Couldn’t load history.json ('+err.message+'). If you opened this file directly, serve it over HTTP or wait for the next GitHub Pages build.';
+  return;
+}
+status.remove();
+const days = D.days, M = D.m, N = days.length;
+const GROUPS = [
+  {k:'run', label:'Accepting', v:'--run'},
+  {k:'full', label:'Full', v:'--full'},
+  {k:'err', label:'Error', v:'--err'},
+  {k:'off', label:'Offline', v:'--off'},
+  {k:'svc', label:'Service', v:'--svc'},
+];
+const G = {R:'run',F:'full',E:'err',O:'off',U:'off',M:'svc',C:'svc',S:'svc'};
+const gi = Object.fromEntries(GROUPS.map((g,i)=>[g.k,i]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let COL = {};
+function readColors(){ GROUPS.forEach(g=>COL[g.k]=css(g.v)); COL.faint=css('--faint'); COL.ink=css('--ink'); COL.line=css('--line'); }
+readColors();
+
+// per-day counts
+const counts = days.map(()=>[0,0,0,0,0]);
+M.forEach(m=>{
+  let present=0, run=0, first=-1;
+  for(let i=0;i<N;i++){ const c=m.s[i]; if(c==='.') continue; if(first<0) first=i; present++; if(c==='R') run++; counts[i][gi[G[c]]]++; }
+  m.present=present; m.run=run; m.first=first; m.pct = present? run/present : 0;
+  m.search=(m.n+' '+m.a).toLowerCase();
+});
+const totals = counts.map(c=>c.reduce((a,b)=>a+b,0));
+
+const fmtDay = i => { const d=new Date(days[i]+'T00:00:00'); return d.toLocaleDateString('en-SG',{day:'numeric',month:'short'}); };
+const fmtLong = i => { const d=new Date(days[i]+'T00:00:00'); return d.toLocaleDateString('en-SG',{day:'numeric',month:'long',year:'numeric'}); };
+const fmtDow = i => new Date(days[i]+'T00:00:00').toLocaleDateString('en-SG',{weekday:'long'});
+
+const last=N-1;
+const added = M.filter(m=>m.first>0).length, removed = M.filter(m=>m.s[last]==='.').length;
+document.getElementById('lede').innerHTML =
+  `Singapore’s reverse vending machines for the beverage container return scheme, tracked daily from ${fmtLong(0)} to ${fmtLong(last)}. The network grew from <strong>${totals[0].toLocaleString()}</strong> to <strong>${totals[last].toLocaleString()}</strong> machines; ${added} were added along the way and ${removed} have been removed.`;
+document.getElementById('snap').textContent = `Snapshot as of ${fmtLong(last)}`;
+document.getElementById('foot').textContent = fmtLong(last);
+document.getElementById('startLbl').textContent = fmtDay(0);
+document.getElementById('endLbl').textContent = fmtDay(last);
+
+// ---------- state ----------
+let cur = last, hidden = new Set(), selId = null;
+
+// ---------- map ----------
+const map = document.getElementById('map');
+const NS='http://www.w3.org/2000/svg';
+const lats=M.map(m=>m.la).filter(Boolean), lons=M.map(m=>m.lo).filter(Boolean);
+const minLa=Math.min(...lats), maxLa=Math.max(...lats), minLo=Math.min(...lons), maxLo=Math.max(...lons);
+const k=Math.cos((minLa+maxLa)/2*Math.PI/180);
+const W=1000, H=600, pad=24;
+const sc=Math.min((W-2*pad)/((maxLo-minLo)*k),(H-2*pad)/(maxLa-minLa));
+const ox=(W-(maxLo-minLo)*k*sc)/2, oy=(H-(maxLa-minLa)*sc)/2;
+const dots=[];
+M.forEach((m,idx)=>{
+  if(m.la==null) { dots.push(null); return; }
+  const c=document.createElementNS(NS,'circle');
+  c.setAttribute('cx',(ox+(m.lo-minLo)*k*sc).toFixed(1));
+  c.setAttribute('cy',(oy+(maxLa-m.la)*sc).toFixed(1));
+  c.setAttribute('r',4.2);
+  c.dataset.i=idx;
+  map.appendChild(c); dots.push(c);
+});
+function paintMap(){
+  M.forEach((m,idx)=>{
+    const c=dots[idx]; if(!c) return;
+    const s=m.s[cur];
+    if(s==='.'){ c.style.display='none'; return; }
+    const g=G[s];
+    if(hidden.has(g)){ c.style.display='none'; return; }
+    c.style.display='';
+    c.setAttribute('fill',COL[g]);
+    const isSel = m.id===selId;
+    c.classList.toggle('sel',isSel);
+    c.setAttribute('r', isSel?8:(g==='run'?3.6:4.8));
+  });
+  const s=dots[M.findIndex(m=>m.id===selId)];
+  if(s) map.appendChild(s);
+}
+const maptip=document.getElementById('maptip'), mapbox=map.parentElement;
+function statusName(c){ return c==='.'?'Not listed':({R:'Accepting',F:'Full',E:'Error',O:'Offline',U:'Unknown',M:'Maintenance',C:'Cleaning',S:'Suspended'})[c]; }
+map.addEventListener('pointermove',e=>{
+  const t=e.target.closest('circle');
+  if(!t){ maptip.classList.remove('on'); return; }
+  const m=M[t.dataset.i], r=mapbox.getBoundingClientRect();
+  maptip.innerHTML=`<b>${esc(m.n)}</b><br>${statusName(m.s[cur])} · ${Math.round(m.pct*100)}% of days accepting`;
+  maptip.style.left=(e.clientX-r.left)+'px'; maptip.style.top=(e.clientY-r.top)+'px';
+  maptip.classList.add('on');
+});
+map.addEventListener('pointerleave',()=>maptip.classList.remove('on'));
+map.addEventListener('click',e=>{ const t=e.target.closest('circle'); if(!t) return; select(M[t.dataset.i].id, true); });
+
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ---------- side panel ----------
+const legend=document.getElementById('legend');
+function paintSide(){
+  document.getElementById('day').textContent=fmtDay(cur);
+  document.getElementById('dow').textContent=fmtDow(cur)+', '+new Date(days[cur]+'T00:00:00').getFullYear();
+  const c=counts[cur], t=totals[cur];
+  document.getElementById('availPct').textContent=Math.round(c[0]/t*100)+'%';
+  document.getElementById('availTxt').innerHTML=`of ${t.toLocaleString()} machines<br>accepting containers`;
+  legend.innerHTML=GROUPS.map((g,i)=>`<li class="${hidden.has(g.k)?'dim':''}"><button data-g="${g.k}" aria-pressed="${!hidden.has(g.k)}" aria-label="${g.label}: ${c[i]}. Toggle on map"><span class="sw" style="background:var(${g.v})"></span><span>${g.label}</span><span class="n">${c[i].toLocaleString()}</span></button><span class="bar"><i style="width:${(c[i]/t*100).toFixed(1)}%;background:var(${g.v})"></i></span></li>`).join('');
+  document.getElementById('thDay').textContent=fmtDay(cur);
+}
+legend.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-g]'); if(!b) return;
+  const g=b.dataset.g; hidden.has(g)?hidden.delete(g):hidden.add(g);
+  paintSide(); paintMap();
+});
+
+// ---------- scrubber ----------
+const range=document.getElementById('range'); range.max=last; range.value=cur;
+range.addEventListener('input',()=>setDay(+range.value));
+let timer=null;
+const playBtn=document.getElementById('play'), playIcon=document.getElementById('playIcon');
+function stop(){ clearInterval(timer); timer=null; playIcon.innerHTML='<path d="M2 1l11 6-11 6z"/>'; playBtn.setAttribute('aria-label','Play timeline'); }
+playBtn.addEventListener('click',()=>{
+  if(timer){ stop(); return; }
+  if(cur>=last) setDay(0);
+  playIcon.innerHTML='<path d="M2 1h3.5v12H2zM8.5 1H12v12H8.5z"/>'; playBtn.setAttribute('aria-label','Pause timeline');
+  timer=setInterval(()=>{ if(cur>=last){ stop(); return; } setDay(cur+1); },90);
+});
+
+// ---------- charts ----------
+const CW=520, CH=230, L=40, R=8, T=10, B=26;
+const x = i => L + (i+.5)*(CW-L-R)/N, bw=(CW-L-R)/N;
+function ticksFor(max){ const step=max>1000?500:max>200?100:max>60?20:10; const a=[]; for(let v=0;v<=max;v+=step) a.push(v); return a; }
+function monthTicks(){ const out=[]; days.forEach((d,i)=>{ if(d.endsWith('-01')||i===0) out.push(i); }); return out; }
+function axes(svg,max,yOf){
+  let s='';
+  ticksFor(max).forEach(v=>{ const y=yOf(v); s+=`<line class="axis" x1="${L}" x2="${CW-R}" y1="${y}" y2="${y}" stroke-dasharray="${v?'2 3':''}"/><text x="${L-6}" y="${y+4}" text-anchor="end">${v.toLocaleString()}</text>`; });
+  monthTicks().forEach(i=>{ const d=new Date(days[i]+'T00:00:00'); s+=`<text x="${x(i)}" y="${CH-8}" text-anchor="${i===0?'start':'middle'}">${d.toLocaleDateString('en-SG',{month:'short'})}</text>`; });
+  return s;
+}
+function drawC1(){
+  const svg=document.getElementById('c1');
+  const max=Math.ceil(Math.max(...totals)/500)*500;
+  const y=v=>T+(CH-T-B)*(1-v/max);
+  let s=axes(svg,max,y);
+  let run='M'+x(0)+','+y(0), tot='';
+  counts.forEach((c,i)=>{ run+=` L${x(i)},${y(c[0])}`; tot+=(i?' L':'M')+x(i)+','+y(totals[i]); });
+  run+=` L${x(last)},${y(0)}Z`;
+  s+=`<path d="${run}" fill="${COL.run}" fill-opacity=".85"/><path d="${tot}" fill="none" stroke="${COL.ink}" stroke-width="1.6"/>`;
+  s+=`<line class="cursor" id="cur1" y1="${T}" y2="${CH-B}"/>`;
+  svg.innerHTML=s;
+}
+function drawC2(){
+  const svg=document.getElementById('c2');
+  const down=counts.map(c=>c[1]+c[2]+c[3]+c[4]);
+  const max=Math.max(20,Math.ceil(Math.max(...down)/50)*50);
+  const y=v=>T+(CH-T-B)*(1-v/max);
+  let s=axes(svg,max,y);
+  counts.forEach((c,i)=>{
+    let acc=0;
+    [1,2,3,4].forEach(g=>{ if(!c[g]) return; const y0=y(acc), y1=y(acc+c[g]); s+=`<rect x="${(x(i)-bw/2+.3).toFixed(2)}" width="${Math.max(bw-.6,.6).toFixed(2)}" y="${y1.toFixed(1)}" height="${(y0-y1).toFixed(1)}" fill="${COL[GROUPS[g].k]}"/>`; acc+=c[g]; });
+  });
+  s+=`<line class="cursor" id="cur2" y1="${T}" y2="${CH-B}"/>`;
+  svg.innerHTML=s;
+}
+function chartIndex(svg,e){ const r=svg.getBoundingClientRect(); const px=(e.clientX-r.left)/r.width*CW; return Math.max(0,Math.min(last,Math.floor((px-L)/((CW-L-R)/N)))); }
+[['c1','tip1',i=>`<b>${fmtDay(i)}</b><br>${totals[i].toLocaleString()} machines, ${counts[i][0].toLocaleString()} accepting`],
+ ['c2','tip2',i=>{const c=counts[i];return `<b>${fmtDay(i)}</b><br>Full ${c[1]} · Error ${c[2]}<br>Offline ${c[3]} · Service ${c[4]}`;}]].forEach(([id,tid,f])=>{
+  const svg=document.getElementById(id), tip=document.getElementById(tid), box=svg.parentElement;
+  svg.addEventListener('pointermove',e=>{ const i=chartIndex(svg,e), r=box.getBoundingClientRect(); tip.innerHTML=f(i); tip.style.left=(e.clientX-r.left)+'px'; tip.style.top=(e.clientY-r.top)+'px'; tip.classList.add('on'); });
+  svg.addEventListener('pointerleave',()=>tip.classList.remove('on'));
+  svg.addEventListener('click',e=>{ stop(); setDay(chartIndex(svg,e)); });
+});
+function moveCursors(){ ['cur1','cur2'].forEach(id=>{ const l=document.getElementById(id); if(l){ l.setAttribute('x1',x(cur)); l.setAttribute('x2',x(cur)); } }); }
+
+// ---------- table ----------
+const tb=document.getElementById('tb'), q=document.getElementById('q'), fStatus=document.getElementById('fStatus'), sortSel=document.getElementById('sort'), more=document.getElementById('more'), empty=document.getElementById('empty');
+fStatus.innerHTML='<option value="">Any status</option>'+GROUPS.map(g=>`<option value="${g.k}">${g.label}</option>`).join('')+'<option value="gone">Not listed</option>';
+let shown=40, rows=[];
+function streak(m){ // consecutive days up to cur in same group, not accepting
+  const c=m.s[cur]; if(c==='.'||c==='R') return 0; const g=G[c]; let n=0;
+  for(let i=cur;i>=0;i--){ const ci=m.s[i]; if(ci!=='.'&&ci!=='R') n++; else break; } return n;
+}
+function buildRows(){
+  const term=q.value.trim().toLowerCase(), fs=fStatus.value;
+  rows=M.filter(m=>{
+    if(term && !m.search.includes(term)) return false;
+    const c=m.s[cur];
+    if(fs==='gone') return c==='.';
+    if(fs) return c!=='.' && G[c]===fs;
+    return true;
+  });
+  const by=sortSel.value;
+  rows.forEach(m=>m._st=streak(m));
+  const cmp={
+    down:(a,b)=>b._st-a._st||a.pct-b.pct,
+    worst:(a,b)=>a.pct-b.pct||b.present-a.present,
+    best:(a,b)=>b.pct-a.pct||b.present-a.present,
+    name:(a,b)=>a.n.localeCompare(b.n),
+    new:(a,b)=>b.first-a.first||a.n.localeCompare(b.n)
+  }[by];
+  rows.sort(cmp);
+  if(selId!=null){ const k=rows.findIndex(m=>m.id===selId); if(k>0){ const [m]=rows.splice(k,1); rows.unshift(m);} }
+}
+function paintTable(){
+  const slice=rows.slice(0,shown);
+  empty.hidden=rows.length>0;
+  tb.innerHTML=slice.map(m=>{
+    const c=m.s[cur], g=c==='.'?null:G[c];
+    const st=m._st?`<br><span style="color:var(--muted);font-size:.8rem">${m._st} day${m._st>1?'s':''} out</span>`:'';
+    return `<tr data-id="${m.id}" class="${m.id===selId?'sel':''}" tabindex="0"><td class="nm"><b>${esc(m.n)}</b><span>${esc(m.a)}${m.h?' · '+esc(m.h.replace(/\s+/g,' ')):''}</span></td><td><span class="pill"><i style="background:${g?COL[g]:'transparent'};${g?'':'border:1px solid var(--line)'}"></i>${statusName(c)}</span>${st}</td><td class="pct">${m.present?Math.round(m.pct*100)+'%':'–'}<br><span style="color:var(--muted);font-weight:400;font-size:.8rem">${m.run}/${m.present}</span></td><td><canvas class="strip" width="520" height="32"></canvas></td></tr>`;
+  }).join('');
+  tb.querySelectorAll('tr').forEach((tr,j)=>drawStrip(tr.querySelector('canvas'),slice[j]));
+  more.hidden=rows.length<=shown;
+  more.textContent=`Show more (${(rows.length-shown).toLocaleString()} left)`;
+}
+function drawStrip(cv,m){
+  const ctx=cv.getContext('2d'), w=cv.width, h=cv.height, bw=w/N;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle=COL.faint; ctx.fillRect(0,0,w,h);
+  for(let i=0;i<N;i++){ const c=m.s[i]; if(c==='.') continue; ctx.fillStyle=COL[G[c]]; ctx.fillRect(Math.floor(i*bw),0,Math.ceil(bw),h); }
+  ctx.fillStyle=COL.ink; ctx.fillRect(Math.floor(cur*bw),0,Math.max(2,Math.ceil(bw/2)),h);
+}
+function refreshTable(){ buildRows(); paintTable(); }
+q.addEventListener('input',()=>{ shown=40; refreshTable(); });
+fStatus.addEventListener('change',()=>{ shown=40; refreshTable(); });
+sortSel.addEventListener('change',()=>{ shown=40; refreshTable(); });
+more.addEventListener('click',()=>{ shown+=80; paintTable(); });
+tb.addEventListener('click',e=>{ const tr=e.target.closest('tr'); if(tr) select(+tr.dataset.id,false); });
+tb.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const tr=e.target.closest('tr'); if(tr) select(+tr.dataset.id,false); } });
+
+function select(id,fromMap){
+  selId = selId===id?null:id;
+  paintMap();
+  if(fromMap){ q.value=''; fStatus.value=''; shown=40; refreshTable(); document.querySelector('.tablewrap').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}); }
+  else { tb.querySelectorAll('tr').forEach(tr=>tr.classList.toggle('sel',+tr.dataset.id===selId)); if(selId!=null) mapbox.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'}); }
+}
+
+// ---------- day change ----------
+let tblPending=null;
+function setDay(i){
+  cur=i; range.value=i;
+  paintSide(); paintMap(); moveCursors();
+  clearTimeout(tblPending); tblPending=setTimeout(refreshTable, timer?250:40);
+}
+
+function drawAll(){ readColors(); drawC1(); drawC2(); moveCursors(); paintMap(); paintTable(); }
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',drawAll);
+new MutationObserver(drawAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+drawC1(); drawC2(); paintSide(); paintMap(); moveCursors(); refreshTable();
+})();
+</script>
+</body>
+</html>
