@@ -31,7 +31,13 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parent.parent
 DIR = ROOT / "archive" / "bins"
 STATE = DIR / "state.json"
-BASE = os.environ.get("BCRS_BTS_URL", "https://bts.bcrs.sg/forapi/v2").rstrip("/")
+# Two routes to the same BCRS data: the platform TheDJVG/BCRSTracking reads, and the
+# proxy returnright.sg's own map uses (the one this repo's daily archive already reads
+# successfully from GitHub). The first that answers is used.
+SOURCES = ([(os.environ["BCRS_BTS_URL"].rstrip("/"), "https://bts.bcrs.sg/")] if os.environ.get("BCRS_BTS_URL") else [
+    ("https://bts.bcrs.sg/forapi/v2", "https://bts.bcrs.sg/"),
+    ("https://returnright.sg/px-api", "https://returnright.sg/px/"),
+])
 SGT = ZoneInfo("Asia/Singapore")
 WORKERS = 4
 RPS = float(os.environ.get("BINS_RPS", "4"))   # about 6 minutes for 1,400 machines
@@ -49,9 +55,11 @@ def b36(n):
 
 
 class Api:
-    def __init__(self):
+    def __init__(self, base, referer):
+        self.base, self.referer = base, referer
         self.token, self.lock = None, threading.Lock()
         self.gap, self.next_at = 1.0 / RPS, 0.0
+        self.last_error = ""
 
     def _wait(self):
         with self.lock:
@@ -62,14 +70,17 @@ class Api:
             time.sleep(delay)
 
     def _get(self, path, auth):
-        headers = {"User-Agent": "bcrs-tracker-dashboard (+github actions)",
-                   "Accept": "application/json", "x-bcrs-client": "web",
-                   "Referer": "https://bts.bcrs.sg/"}
+        headers = {"User-Agent": "Mozilla/5.0 (bcrs-tracker-dashboard)",
+                   "Accept": "application/json", "x-bcrs-client": "web", "Referer": self.referer}
         if auth:
             headers["x-bcrs-map-token"] = self._token()
         self._wait()
-        with urllib.request.urlopen(urllib.request.Request(BASE + path, headers=headers), timeout=20) as r:
-            return json.load(r)
+        with urllib.request.urlopen(urllib.request.Request(self.base + path, headers=headers), timeout=20) as r:
+            raw = r.read()
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            raise ValueError(f"{path}: not JSON (starts {raw[:120]!r})")
 
     def _token(self):
         with self.lock:
@@ -81,26 +92,37 @@ class Api:
         tok = next((inner.get(k) or body.get(k) for k in ("token", "accessToken", "access_token", "mapToken")
                     if inner.get(k) or body.get(k)), None)
         if not tok:
-            raise RuntimeError(f"no token in access-token response: {str(body)[:200]}")
+            raise ValueError(f"no token in access-token response: {str(body)[:200]}")
         with self.lock:
             self.token = tok
         return tok
+
+    @staticmethod
+    def describe(e):
+        if isinstance(e, urllib.error.HTTPError):
+            try:
+                body = e.read()[:150]
+            except Exception:
+                body = b""
+            return f"HTTP {e.code} from {e.url} (server={e.headers.get('server', '?')}) body={body!r}"
+        return f"{type(e).__name__}: {e}"
 
     def get(self, path, tries=4):
         for attempt in range(tries):
             try:
                 return self._get(path, auth=True)
             except urllib.error.HTTPError as e:
+                self.last_error = self.describe(e)
                 if e.code == 403:
                     with self.lock:
-                        self.token = None      # expired token: fetch a new one
-                elif e.code not in (429, 500, 502, 503, 504) or attempt == tries - 1:
-                    raise
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-                if attempt == tries - 1:
-                    raise
-            time.sleep(2 ** attempt)
-        raise RuntimeError(f"{path}: gave up after {tries} tries")
+                        self.token = None      # maybe an expired token: fetch a new one
+                elif e.code not in (429, 500, 502, 503, 504):
+                    break
+            except (urllib.error.URLError, TimeoutError, ValueError) as e:
+                self.last_error = self.describe(e)
+            if attempt < tries - 1:
+                time.sleep(2 ** attempt)
+        raise RuntimeError(f"{self.base}{path} failed after {attempt + 1} tries; last error: {self.last_error}")
 
 
 def returns_for(prev, cur):
@@ -122,11 +144,20 @@ def main():
     now = (dt.datetime.fromisoformat(os.environ["BINS_NOW"]).replace(tzinfo=SGT)
            if os.environ.get("BINS_NOW") else dt.datetime.now(SGT))   # BINS_NOW: testing only
     hour = now.strftime("%Y-%m-%dT%H")
-    api = Api()
-    try:
-        locations = api.get("/locations")["data"]
-    except Exception as e:
-        print(f"::warning::bin readings skipped, locations request failed: {e}")
+    api = locations = None
+    for base, referer in SOURCES:
+        candidate = Api(base, referer)
+        try:
+            locations = candidate.get("/locations")["data"]
+            probe = next(r["id"] for r in locations if r.get("id") is not None)
+            candidate.get(f"/locations/rvms/{probe}/bin-status", tries=2)
+            api = candidate
+            print(f"using {base}")
+            break
+        except Exception as e:
+            print(f"::warning::{base} not usable: {e}")
+    if api is None:
+        print("::warning::bin readings skipped: no source answered (details above)")
         return
     machines = {int(r["id"]): (r.get("supplierId") or COLOR_SUPPLIER.get(r.get("coords_color"), "UNKNOWN"))
                 for r in locations if r.get("id") is not None}
